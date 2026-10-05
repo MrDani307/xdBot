@@ -1,129 +1,437 @@
-#pragma once
+#include "clickbot_layer.hpp"
 
-#include "../includes.hpp"
-#include "../hacks/clickbot.hpp"
-#include "record_layer.hpp"
+void ClickbotLayer::updateLabels() {
+	auto& g = Global::get();
 
-const std::unordered_map<int, std::string> buttons = { {1, ""} };
+	for (size_t i = 0; i < buttonNames.size(); i++) {
+		matjson::Value data = g.mod->getSavedValue<matjson::Value>(buttonNames[i]);
 
-class ClickSettingsLayer : public geode::Popup {
+		ClickSetting settings = matjson::Serialize<ClickSetting>::from_json(data);
 
-private:
+		std::string filename = settings.path.filename().string();
 
-    ClickSetting settings;
-    std::string button;
+		if (!std::filesystem::exists(settings.path)) filename = "N/A";
 
-    Slider* volumeSlider = nullptr;
-    Slider* pitchSlider = nullptr;
+		labels[i]->setString(filename.c_str());
+		labels[i]->limitLabelWidth(72.f, 1.f, 0.01f);
+		labels[i]->updateLabel();
+	}
 
-    CCLabelBMFont* filenameLabel = nullptr;
-    CCLabelBMFont* volumeLabel = nullptr;
-    CCLabelBMFont* pitchLabel = nullptr;
+}
 
-    CCMenuItemToggler* disableToggle = nullptr;
+bool ClickbotLayer::setup() {
+	setTitle("ClickBot");
+	m_title->setPositionY(m_title->getPositionY() + 5);
+	
+	cocos2d::CCPoint offset = (CCDirector::sharedDirector()->getWinSize() - m_mainLayer->getContentSize()) / 2;
+    m_mainLayer->setPosition(m_mainLayer->getPosition() - offset);
+    m_closeBtn->setPosition(m_closeBtn->getPosition() + offset);
+    m_bgSprite->setPosition(m_bgSprite->getPosition() + offset);
+    m_title->setPosition(m_title->getPosition() + offset);
 
-    bool setup() override;
+	Utils::setBackgroundColor(m_bgSprite);
 
-public:
+	CCMenu* menu = CCMenu::create();
+	m_mainLayer->addChild(menu);
 
-    geode::Popup* clickbotLayer = nullptr;
+	CCScale9Sprite* bg = CCScale9Sprite::create("square02b_001.png", { 0, 0, 80, 80 });
+	bg->setColor({ 0,0,0 });
+	bg->setOpacity(78);
+	bg->setPosition(ccp(-79, -10));
+	bg->setAnchorPoint({ 0.5, 0.5 });
+	bg->setContentSize({ 245, 203 });
+	menu->addChild(bg);
 
-    static ClickSettingsLayer* create(std::string button, geode::Popup* layer);
+	CCLabelBMFont* lbl = CCLabelBMFont::create("Clicks", "goldFont.fnt");
+	lbl->setPosition(ccp(-80, 78));
+	lbl->setScale(0.625);
+	menu->addChild(lbl);
 
-    void saveSettings() {
-        matjson::Value data = matjson::Serialize<ClickSetting>::to_json(settings);
-        Mod::get()->setSavedValue(button, data);
-        
-        Clickbot::updateSounds();
-    }
+	lbl = CCLabelBMFont::create("Hold Click", "bigFont.fnt");
+	lbl->setPosition(ccp(-142, 57));
+	lbl->setScale(0.35);
+	menu->addChild(lbl);
 
-    void onSelectFile(CCObject*);
+	bg = CCScale9Sprite::create("square02b_001.png", { 0, 0, 80, 80 });
+	bg->setScale(0.375);
+	bg->setColor({ 0,0,0 });
+	bg->setOpacity(78);
+	bg->setPosition(ccp(-150, 35));
+	bg->setAnchorPoint({ 0.5, 0.5 });
+	bg->setContentSize({ 230, 55 });
+	menu->addChild(bg);
 
-    void onDisable(CCObject* obj) {
-        CCMenuItemToggler* toggle = static_cast<CCMenuItemToggler*>(obj);
+	lbl = CCLabelBMFont::create("easter egg", "chatFont.fnt");
+	lbl->setPosition(ccp(-150, 35));
+	menu->addChild(lbl);
+	labels.push_back(lbl);
 
-        settings.disabled = !toggle->isToggled();
+	CCSprite* spr = CCSprite::createWithSpriteFrameName("GJ_optionsBtn_001.png");
+	spr->setScale(0.375f);
 
-        saveSettings();
-    }
+	CCMenuItemSpriteExtra* btn = CCMenuItemSpriteExtra::create(spr, this, menu_selector(ClickbotLayer::openClickSettings));
+	btn->setPosition(ccp(-94, 35));
+	btn->setID("hold_click");
+	menu->addChild(btn);
 
-    void updateVolume(CCObject*) {
-        settings.volume = static_cast<int>(volumeSlider->getThumb()->getValue() * 300.f);
+	lbl = CCLabelBMFont::create("Release Click", "bigFont.fnt");
+	lbl->setPosition(ccp(-21, 57));
+	lbl->setScale(0.35);
+	menu->addChild(lbl);
 
-        volumeLabel->setString(("Volume (" + std::to_string(settings.volume) + "%)").c_str());
+	bg = CCScale9Sprite::create("square02b_001.png", { 0, 0, 80, 80 });
+	bg->setScale(0.375);
+	bg->setColor({ 0,0,0 });
+	bg->setOpacity(78);
+	bg->setPosition(ccp(-29, 35));
+	bg->setAnchorPoint({ 0.5, 0.5 });
+	bg->setContentSize({ 230, 55 });
+	menu->addChild(bg);
 
-        saveSettings();
-    }
+	lbl = CCLabelBMFont::create("easter egg", "chatFont.fnt");
+	lbl->setPosition(ccp(-29, 35));
+	lbl->setScale(0.425);
+	menu->addChild(lbl);
+	labels.push_back(lbl);
 
-    void updatePitch(CCObject*) {
-        settings.pitch = pitchSlider->getThumb()->getValue() * 3.f;
+	btn = CCMenuItemSpriteExtra::create(spr, this, menu_selector(ClickbotLayer::openClickSettings));
+	btn->setPosition(ccp(27, 35));
+	btn->setID("release_click");
+	menu->addChild(btn);
 
-        std::ostringstream oss;
-        oss << std::fixed << std::setprecision(1) << settings.pitch;
+	lbl = CCLabelBMFont::create("Hold Left", "bigFont.fnt");
+	lbl->setPosition(ccp(-142, 0));
+	lbl->setScale(0.35);
+	menu->addChild(lbl);
 
-        if (oss.str() == "1.0")
-            settings.pitch = 1.f;
+	bg = CCScale9Sprite::create("square02b_001.png", { 0, 0, 80, 80 });
+	bg->setScale(0.375);
+	bg->setColor({ 0,0,0 });
+	bg->setOpacity(78);
+	bg->setPosition(ccp(-150, -22));
+	bg->setAnchorPoint({ 0.5, 0.5 });
+	bg->setContentSize({ 230, 55 });
+	menu->addChild(bg);
 
-        pitchLabel->setString(("Pitch (" + oss.str() + ")").c_str());
+	lbl = CCLabelBMFont::create("easter egg", "chatFont.fnt");
+	lbl->setPosition(ccp(-150, -22));
+	lbl->setScale(0.425);
+	menu->addChild(lbl);
+	labels.push_back(lbl);
 
-        saveSettings();
-    }
+	btn = CCMenuItemSpriteExtra::create(spr, this, menu_selector(ClickbotLayer::openClickSettings));
+	btn->setPosition(ccp(-94, -22));
+	btn->setID("hold_left");
+	menu->addChild(btn);
 
-    void onRestore(CCObject*);
-    
-};
+	lbl = CCLabelBMFont::create("Release Left", "bigFont.fnt");
+	lbl->setPosition(ccp(-21, -0));
+	lbl->setScale(0.35);
+	menu->addChild(lbl);
 
+	bg = CCScale9Sprite::create("square02b_001.png", { 0, 0, 80, 80 });
+	bg->setScale(0.375);
+	bg->setColor({ 0,0,0 });
+	bg->setOpacity(78);
+	bg->setPosition(ccp(-29, -22));
+	bg->setAnchorPoint({ 0.5, 0.5 });
+	bg->setContentSize({ 230, 55 });
+	menu->addChild(bg);
 
-class ClickbotLayer : public geode::Popup {
+	lbl = CCLabelBMFont::create("easter egg", "chatFont.fnt");
+	lbl->setPosition(ccp(-29, -22));
+	lbl->setScale(0.425);
+	menu->addChild(lbl);
+	labels.push_back(lbl);
 
-    Slider* volumeSlider = nullptr;
-    Slider* pitchSlider = nullptr;
+	btn = CCMenuItemSpriteExtra::create(spr, this, menu_selector(ClickbotLayer::openClickSettings));
+	btn->setPosition(ccp(27, -22));
+	btn->setID("release_left");
+	menu->addChild(btn);
 
-    CCLabelBMFont* volumeLabel = nullptr;
-    CCLabelBMFont* pitchLabel = nullptr;
+	lbl = CCLabelBMFont::create("Hold Right", "bigFont.fnt");
+	lbl->setPosition(ccp(-142, -57));
+	lbl->setScale(0.35);
+	menu->addChild(lbl);
 
-private:
+	bg = CCScale9Sprite::create("square02b_001.png", { 0, 0, 80, 80 });
+	bg->setScale(0.375);
+	bg->setColor({ 0,0,0 });
+	bg->setOpacity(78);
+	bg->setPosition(ccp(-150, -79));
+	bg->setAnchorPoint({ 0.5, 0.5 });
+	bg->setContentSize({ 230, 55 });
+	menu->addChild(bg);
 
-    bool setup() override;
+	lbl = CCLabelBMFont::create("easter egg", "chatFont.fnt");
+	lbl->setPosition(ccp(-150, -79));
+	lbl->setScale(0.425);
+	menu->addChild(lbl);
+	labels.push_back(lbl);
 
-public:
+	btn = CCMenuItemSpriteExtra::create(spr, this, menu_selector(ClickbotLayer::openClickSettings));
+	btn->setPosition(ccp(-94, -79));
+	btn->setID("hold_right");
+	menu->addChild(btn);
 
-    STATIC_CREATE(ClickbotLayer, 432, 250)
-    
-    std::vector<CCLabelBMFont*> labels;
+	lbl = CCLabelBMFont::create("Release Right", "bigFont.fnt");
+	lbl->setPosition(ccp(-21, -57));
+	lbl->setScale(0.35);
+	menu->addChild(lbl);
 
-    void open(CCObject*) {
-        ClickbotLayer::create()->show();
-    }
+	bg = CCScale9Sprite::create("square02b_001.png", { 0, 0, 80, 80 });
+	bg->setScale(0.375);
+	bg->setColor({ 0,0,0 });
+	bg->setOpacity(78);
+	bg->setPosition(ccp(-29, -79));
+	bg->setAnchorPoint({ 0.5, 0.5 });
+	bg->setContentSize({ 230, 55 });
+	menu->addChild(bg);
 
-    void openClickSettings(CCObject* obj) {
-        std::string id = static_cast<CCMenuItemSpriteExtra*>(obj)->getID();
-        ClickSettingsLayer::create(id, static_cast<geode::Popup*>(this))->show();
-    }
+	lbl = CCLabelBMFont::create("easter egg", "chatFont.fnt");
+	lbl->setPosition(ccp(-29, -79));
+	lbl->setScale(0.425);
+	menu->addChild(lbl);
+	labels.push_back(lbl);
 
-    void updateLabels();
+	btn = CCMenuItemSpriteExtra::create(spr, this, menu_selector(ClickbotLayer::openClickSettings));
+	btn->setPosition(ccp(27, -79));
+	btn->setID("release_right");
+	menu->addChild(btn);
 
-    void updateVolume(CCObject*) {
-        int volume = static_cast<int>(volumeSlider->getThumb()->getValue() * 300.f);
+	bg = CCScale9Sprite::create("square02b_001.png", { 0, 0, 80, 80 });
+	bg->setColor({ 0,0,0 });
+	bg->setOpacity(78);
+	bg->setPosition(ccp(128, -10));
+	bg->setAnchorPoint({ 0.5, 0.5 });
+	bg->setContentSize({ 148, 203 });
+	menu->addChild(bg);
 
-        volumeLabel->setString(("Master Volume (" + std::to_string(volume) + "%)").c_str());
+	lbl = CCLabelBMFont::create("Settings", "goldFont.fnt");
+	lbl->setPosition(ccp(128, 78));
+	lbl->setScale(0.625);
+	menu->addChild(lbl);
 
-        Mod::get()->setSavedValue("clickbot_volume", volume);
-    }
+	int volume = Mod::get()->getSavedValue<int64_t>("clickbot_volume");
 
-    void updatePitch(CCObject*) {
-        float pitch = pitchSlider->getThumb()->getValue() * 3.f;
+	volumeSlider = Slider::create(
+		this,
+		menu_selector(ClickbotLayer::updateVolume),
+		0.8f
+	);
+	volumeSlider->setPosition(ccp(128, 49));
+	volumeSlider->setAnchorPoint({ 0.f, 0.f });
+	volumeSlider->setScale(0.65f);
+	volumeSlider->setValue(volume / 300.f);
+	menu->addChild(volumeSlider);
 
-        std::ostringstream oss;
-        oss << std::fixed << std::setprecision(1) << pitch;
+	volumeLabel = CCLabelBMFont::create(("Master Volume (" + std::to_string(volume) + "%)").c_str(), "goldFont.fnt");
+	volumeLabel->setPosition(ccp(128, 35));
+	volumeLabel->setScale(0.35f);
+	menu->addChild(volumeLabel);
 
-        if (oss.str() == "1.0")
-            pitch = 1.f;
+	float pitch = Mod::get()->getSavedValue<float>("clickbot_pitch");
 
-        pitchLabel->setString(("Master Pitch (" + oss.str() + ")").c_str());
+	pitchSlider = Slider::create(
+		this,
+		menu_selector(ClickbotLayer::updatePitch),
+		0.8f
+	);
+	pitchSlider->setPosition(ccp(128, 7));
+	pitchSlider->setAnchorPoint({ 0.f, 0.f });
+	pitchSlider->setScale(0.65f);
+	pitchSlider->setValue(pitch / 3.f);
+	menu->addChild(pitchSlider);
 
-        Mod::get()->setSavedValue("clickbot_pitch", pitch);
-    }
+	std::ostringstream oss;
+	oss << std::fixed << std::setprecision(1) << pitch;
 
+	pitchLabel = CCLabelBMFont::create(("Master Pitch (" + oss.str() + ")").c_str(), "goldFont.fnt");
+	pitchLabel->setPosition(ccp(128, -7));
+	pitchLabel->setScale(0.35f);
+	menu->addChild(pitchLabel);
 
-};
+	CCSprite* spriteOn = CCSprite::createWithSpriteFrameName("GJ_checkOn_001.png");
+	CCSprite* spriteOff = CCSprite::createWithSpriteFrameName("GJ_checkOff_001.png");
+
+	CCMenuItemToggler* toggle = CCMenuItemToggler::create(spriteOff, spriteOn, this, menu_selector(RecordLayer::toggleSetting));
+	toggle->setScale(0.55f);
+	toggle->setPosition(ccp(73, -40));
+	toggle->toggle(Mod::get()->getSavedValue<bool>("clickbot_playing_only"));
+	toggle->setID("clickbot_playing_only");
+	menu->addChild(toggle);
+
+	lbl = CCLabelBMFont::create("Playing Macro Only", "bigFont.fnt");
+	lbl->setPosition(ccp(88, -40));
+	lbl->setAnchorPoint({ 0, 0.5 });
+	lbl->setScale(0.3f);
+	menu->addChild(lbl);
+
+	toggle = CCMenuItemToggler::create(spriteOff, spriteOn, this, menu_selector(RecordLayer::toggleSetting));
+	toggle->setScale(0.55f);
+	toggle->setPosition(ccp(73, -70));
+	toggle->toggle(Mod::get()->getSavedValue<bool>("clickbot_holding_only"));
+	toggle->setID("clickbot_holding_only");
+	menu->addChild(toggle);
+
+	lbl = CCLabelBMFont::create("Hold Only", "bigFont.fnt");
+	lbl->setPosition(ccp(88, -70));
+	lbl->setAnchorPoint({ 0, 0.5 });
+	lbl->setScale(0.3f);
+	menu->addChild(lbl);
+
+	updateLabels();
+
+	return true;
+}
+
+ClickSettingsLayer* ClickSettingsLayer::create(std::string button, geode::Popup* layer) {
+	ClickSettingsLayer* ret = new ClickSettingsLayer();
+	ret->button = std::move(button);
+	ret->clickbotLayer = layer;
+	if (ret->init(250, 173, Utils::getTexture().c_str()) && ret->setup()) {
+		ret->autorelease();
+		return ret;
+	}
+
+	delete ret;
+	return nullptr;
+}
+
+bool ClickSettingsLayer::setup() {
+	cocos2d::CCPoint offset = (CCDirector::sharedDirector()->getWinSize() - m_mainLayer->getContentSize()) / 2;
+    m_mainLayer->setPosition(m_mainLayer->getPosition() - offset);
+    m_closeBtn->setPosition(m_closeBtn->getPosition() + offset);
+    m_bgSprite->setPosition(m_bgSprite->getPosition() + offset);
+	
+	Utils::setBackgroundColor(m_bgSprite);
+
+	CCMenu* menu = CCMenu::create();
+	m_mainLayer->addChild(menu);
+
+	matjson::Value data = Mod::get()->getSavedValue<matjson::Value>(button);
+	settings = matjson::Serialize<ClickSetting>::from_json(data);
+	std::string filename = settings.path.filename().string();
+
+	if (!std::filesystem::exists(settings.path)) filename = "N/A";
+
+	CCScale9Sprite* bg = CCScale9Sprite::create("square02b_001.png", { 0, 0, 80, 80 });
+	bg->setColor({ 0,0,0 });
+	bg->setScale(0.6f);
+	bg->setOpacity(88);
+	bg->setPosition(ccp(-37.5, 52));
+	bg->setContentSize({ 230, 55 });
+	menu->addChild(bg);
+
+	filenameLabel = CCLabelBMFont::create(filename.c_str(), "chatFont.fnt");
+	filenameLabel->setPosition(ccp(-37.5, 52));
+	filenameLabel->limitLabelWidth(125.f, 0.675f, 0.01f);
+	filenameLabel->updateLabel();
+	menu->addChild(filenameLabel);
+
+	ButtonSprite* spr = ButtonSprite::create("Select");
+	spr->setScale(0.6f);
+
+	CCMenuItemSpriteExtra* btn = CCMenuItemSpriteExtra::create(spr, this, menu_selector(ClickSettingsLayer::onSelectFile));
+	btn->setPosition(ccp(77, 52));
+	menu->addChild(btn);
+
+	volumeSlider = Slider::create(
+		this,
+		menu_selector(ClickSettingsLayer::updateVolume),
+		0.8f
+	);
+	volumeSlider->setPosition(ccp(-42, 7));
+	volumeSlider->setAnchorPoint({ 0.f, 0.f });
+	volumeSlider->setScale(0.8f);
+	volumeSlider->setValue(settings.volume / 300.f);
+	menu->addChild(volumeSlider);
+
+	volumeLabel = CCLabelBMFont::create(("Volume (" + std::to_string(settings.volume) + "%)").c_str(), "goldFont.fnt");
+	volumeLabel->setPosition(ccp(-42, -9));
+	volumeLabel->setScale(0.45f);
+	menu->addChild(volumeLabel);
+
+	pitchSlider = Slider::create(
+		this,
+		menu_selector(ClickSettingsLayer::updatePitch),
+		0.8f
+	);
+	pitchSlider->setPosition(ccp(-42, -40));
+	pitchSlider->setAnchorPoint({ 0.f, 0.f });
+	pitchSlider->setScale(0.8f);
+	pitchSlider->setValue(settings.pitch / 3.f);
+	menu->addChild(pitchSlider);
+
+	std::ostringstream oss;
+	oss << std::fixed << std::setprecision(1) << settings.pitch;
+
+	pitchLabel = CCLabelBMFont::create(("Pitch (" + oss.str() + ")").c_str(), "goldFont.fnt");
+	pitchLabel->setPosition(ccp(-42, -56));
+	pitchLabel->setScale(0.45f);
+	menu->addChild(pitchLabel);
+
+	CCSprite* spriteOn = CCSprite::createWithSpriteFrameName("GJ_checkOn_001.png");
+	CCSprite* spriteOff = CCSprite::createWithSpriteFrameName("GJ_checkOff_001.png");
+
+	disableToggle = CCMenuItemToggler::create(spriteOff, spriteOn, this, menu_selector(ClickSettingsLayer::onDisable));
+	disableToggle->setScale(0.7f);
+	disableToggle->setPosition(ccp(76, -9));
+	disableToggle->toggle(settings.disabled);
+	menu->addChild(disableToggle);
+
+	CCLabelBMFont* lbl = CCLabelBMFont::create("Disable", "bigFont.fnt");
+	lbl->setPosition(ccp(76, -32));
+	lbl->setScale(0.45f);
+	menu->addChild(lbl);
+
+	spr = ButtonSprite::create("Restore");
+	spr->setScale(0.425f);
+	btn = CCMenuItemSpriteExtra::create(spr, this, menu_selector(ClickSettingsLayer::onRestore));
+	btn->setPosition({89, -69});
+	menu->addChild(btn);
+
+	return true;
+}
+
+void ClickSettingsLayer::onSelectFile(CCObject*) {
+	file::FilePickOptions::Filter textFilter;
+	file::FilePickOptions fileOptions;
+	textFilter.description = "Macro Files";
+	textFilter.files = { "*.mp3", "*.ogg" };
+	fileOptions.filters.push_back(textFilter);
+
+	file::pick(file::PickMode::OpenFile, { Mod::get()->getResourcesDir(), { textFilter } }).listen([this](Result<std::filesystem::path>* res) {
+		if (res->isOk()) {
+			std::filesystem::path path = res->unwrapOrDefault();
+
+			filenameLabel->setString(path.filename().string().c_str());
+
+			settings.path = path;
+			saveSettings();
+
+			static_cast<ClickbotLayer*>(clickbotLayer)->updateLabels();
+		}
+		});
+}
+
+void ClickSettingsLayer::onRestore(CCObject*) {
+	pitchSlider->setValue(0.33333333f);
+	volumeSlider->setValue(0.33333333f);
+
+	updatePitch(nullptr);
+	updateVolume(nullptr);
+
+	disableToggle->toggle(false);
+
+	settings.disabled = false;
+	
+	std::filesystem::path path = Mod::get()->getResourcesDir() / fmt::format("default_{}.mp3", button);
+
+	filenameLabel->setString(path.filename().string().c_str());
+
+	settings.path = path;
+	saveSettings();
+
+	static_cast<ClickbotLayer*>(clickbotLayer)->updateLabels();
+}
