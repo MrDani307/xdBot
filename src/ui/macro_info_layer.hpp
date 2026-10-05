@@ -18,7 +18,7 @@ public:
 
 private:
 
-    bool setup() override {
+    bool setup() {
         setTitle("Current Macro");
         auto& g = Global::get();
 
