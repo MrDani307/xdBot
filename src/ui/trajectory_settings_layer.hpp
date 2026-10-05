@@ -18,7 +18,7 @@ private:
 
 	TextInput* input = nullptr;
 	
-    bool setup() override {
+    bool setup() {
         setTitle("Show Trajectory");
 
     	Utils::setBackgroundColor(m_bgSprite);
